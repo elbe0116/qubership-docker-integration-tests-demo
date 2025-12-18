@@ -277,4 +277,4 @@ Docker Integration Tests uses the following environment variables:
 
 All of them instead of `TAGS`, `ONLY_INTEGRATION_TESTS`, `STATUS_CUSTOM_RESOURCE_NAMESPACE`,
 `STATUS_CUSTOM_RESOURCE_PATH` and maybe `DEBUG` we recommend overriding in the docker file and do not
-forward them to the integration tests deployment environment.
+forward them to the integration tests deployment environment. 
