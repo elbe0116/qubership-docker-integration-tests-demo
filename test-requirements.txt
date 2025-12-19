@@ -1,4 +1,6 @@
-pytest
+pytest>=8.0.0
+pytest-bdd>=7.3.0
 pytest-mock
 pytest-cov
 coverage
+allure-pytest>=2.13.0
