@@ -12,33 +12,42 @@ init_environment() {
         CURRENT_TIME=$(date +%H-%M-%S)  # e.g., 11-48-00
     fi
 
-    # Configure AWS S3 parameters (required) - using local variables for security
-    if [[ -z "${S3_ACCESS_KEY}" ]]; then
-        echo "❌ S3_ACCESS_KEY is required but not set"
-        exit 1
+    # Check if S3 integration is enabled (based on ATP_STORAGE_BUCKET)
+    if [[ -n "${ATP_STORAGE_BUCKET}" ]]; then
+        echo "📦 S3 integration enabled (bucket: ${ATP_STORAGE_BUCKET})"
+        
+        # Configure AWS S3 parameters (required when S3 is enabled) - using local variables for security
+        if [[ -z "${ATP_STORAGE_USERNAME}" ]]; then
+            echo "❌ ATP_STORAGE_USERNAME is required but not set"
+            exit 1
+        fi
+        if [[ -z "${ATP_STORAGE_PASSWORD}" ]]; then
+            echo "❌ ATP_STORAGE_PASSWORD is required but not set"
+            exit 1
+        fi
+        
+        # Store credentials in local variables (not exported to environment)
+        _LOCAL_S3_KEY="$ATP_STORAGE_USERNAME"
+        _LOCAL_S3_SECRET="$ATP_STORAGE_PASSWORD"
+        export AWS_ACCESS_KEY_ID="$_LOCAL_S3_KEY"
+        export AWS_SECRET_ACCESS_KEY="$_LOCAL_S3_SECRET"
+
+        # Configure additional s5cmd settings for MinIO or S3-compatible storage
+        if [[ "${ATP_STORAGE_PROVIDER}" == "minio" || "${ATP_STORAGE_PROVIDER}" == "s3" ]]; then
+            export AWS_ENDPOINT_URL="${ATP_STORAGE_SERVER_URL}"
+            export AWS_REGION="${ATP_STORAGE_REGION:-us-east-1}"  # Default region if not set
+            export AWS_NO_VERIFY_SSL="true"           # Optional: disable SSL verification
+        fi
+    else
+        echo "⚠️ S3 integration disabled (ATP_STORAGE_BUCKET is not set)"
     fi
-    if [[ -z "${S3_SECRET_KEY}" ]]; then
-        echo "❌ S3_SECRET_KEY is required but not set"
-        exit 1
-    fi
+
+    # Define temp clone path
+    export TMP_DIR="/tmp/clone"
+    mkdir -p "$TMP_DIR"
+
+    # Remove previous contents if any
+    rm -rf "${TMP_DIR:?}/"*
     
-    # Store credentials in local variables (not exported to environment)
-    _LOCAL_S3_KEY="$S3_ACCESS_KEY"
-    _LOCAL_S3_SECRET="$S3_SECRET_KEY"
-    export AWS_ACCESS_KEY_ID="$_LOCAL_S3_KEY"
-    export AWS_SECRET_ACCESS_KEY="$_LOCAL_S3_SECRET"
-
-    # Configure additional s5cmd settings for MinIO only
-    if [[ "${S3_TYPE}" == "minio" ]]; then
-        export AWS_ENDPOINT_URL="${S3_API_HOST}"
-        export AWS_REGION="us-east-1"             # Required by s5cmd even for MinIO
-        export AWS_NO_VERIFY_SSL="true"           # Optional: disable SSL verification
-    fi
-
-    # Define adapter S3 directory path
-    ADAPTER_S3_OUT_DIR="${ROBOT_HOME}/output"
-    
-    export ADAPTER_S3_OUT_DIR="${ADAPTER_S3_OUT_DIR}"
-
     echo "✅ Environment initialized successfully"
-} 
+}

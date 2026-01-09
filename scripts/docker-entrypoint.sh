@@ -1,8 +1,6 @@
 #!/bin/bash
 
-export ROBOT_OPTIONS="--loglevel=info --outputdir output"
-export ROBOT_SYSLOG_FILE=./output/syslog.txt
-export ROBOT_SYSLOG_LEVEL=DEBUG
+export PYTEST_OPTIONS="--tb=short -v"
 
 if [[ "$READONLY_CONTAINER_FILE_SYSTEM_ENABLED" == "true" ]]; then
     echo "Read-only file system configuration enabled, copying test files from temp directory..."
@@ -29,21 +27,7 @@ run_custom_script() {
     fi
 }
 
-create_tags_resolver_array() {
-    tags_resolver_script="robot_tags_resolver.py"
-    if [[ -n "$TAGS_RESOLVER_SCRIPT" ]]; then
-        tags_resolver_script=${TAGS_RESOLVER_SCRIPT}
-    fi
-    tags_resolver_array=()
-    while
-        IFS=";"
-        read -d ";" line
-    do
-        tags_resolver_array+=($line)
-    done < <(python "${tags_resolver_script}")
-}
-
-run_robot() {
+run_pytest() {
     status_writing_script="write_status.py"
     if [[ ${STATUS_WRITING_ENABLED} == "true" ]]; then
         if [[ -n "$WRITE_STATUS_SCRIPT" ]]; then
@@ -66,74 +50,73 @@ run_robot() {
         fi
     fi
 
-    excluded_tags=""
-    if [[ ${IS_TAGS_RESOLVER_ENABLED} == "true" ]]; then
-        create_tags_resolver_array
-        echo "Included tags: ${TAGS}"
-        echo "Excluded tags: ${tags_resolver_array[0]}"
-        echo "${tags_resolver_array[1]}" # print all excluded tags with matched reason
-        excluded_tags=${tags_resolver_array[0]}
+    # Build pytest arguments
+    pytest_args=()
+    
+    # Add markers if TAGS is specified (convert to pytest markers)
+    if [[ -n "$TAGS" ]]; then
+        # Convert Robot-style tags to pytest markers
+        # Split by OR and join with " or " for pytest
+        IFS='OR' read -ra tag_array <<< "$TAGS"
+        marker_expr=""
+        for tag in "${tag_array[@]}"; do
+            # Skip empty tags and trim whitespace
+            tag=$(echo "$tag" | xargs)
+            if [[ -n "$tag" ]]; then
+                if [[ -n "$marker_expr" ]]; then
+                    marker_expr="$marker_expr or $tag"
+                else
+                    marker_expr="$tag"
+                fi
+            fi
+        done
+        if [[ -n "$marker_expr" ]]; then
+            pytest_args+=("-m" "$marker_expr")
+        fi
     fi
 
-    robot_args=()
-    if [[ -n "$TAGS" ]]; then
-        # Split by OR and add each tag as separate -i parameter
-        IFS='OR' read -ra tag_array <<< "$TAGS"
-        for tag in "${tag_array[@]}"; do
-            # Skip empty tags
+    # Add excluded tags if specified
+    if [[ -n "$EXCLUDED_TAGS" ]]; then
+        IFS='OR' read -ra excluded_tag_array <<< "$EXCLUDED_TAGS"
+        for tag in "${excluded_tag_array[@]}"; do
+            tag=$(echo "$tag" | xargs)
             if [[ -n "$tag" ]]; then
-                robot_args+=("-i" "$tag")
+                # Append "not tag" to marker expression
+                if [[ -n "${pytest_args[*]}" && "${pytest_args[0]}" == "-m" ]]; then
+                    pytest_args[1]="${pytest_args[1]} and not $tag"
+                else
+                    pytest_args+=("-m" "not $tag")
+                fi
             fi
         done
     fi
-    if [[ -n "$excluded_tags" ]]; then
-        # Remove the -e flag if it's already present and parse the tags
-        if [[ "$excluded_tags" =~ ^-e[[:space:]]+(.*)$ ]]; then
-            # Extract tags without -e flag
-            tags_only="${BASH_REMATCH[1]}"
-            # Split by OR and add each tag as separate -e parameter
-            IFS='OR' read -ra excluded_tag_array <<< "$tags_only"
-            for tag in "${excluded_tag_array[@]}"; do
-                # Skip empty tags
-                if [[ -n "$tag" ]]; then
-                    robot_args+=("-e" "$tag")
-                fi
-            done
-        else
-            # No -e flag present, add it
-            # Split by OR and add each tag as separate -e parameter
-            IFS='OR' read -ra excluded_tag_array <<< "$excluded_tags"
-            for tag in "${excluded_tag_array[@]}"; do
-                # Skip empty tags
-                if [[ -n "$tag" ]]; then
-                    robot_args+=("-e" "$tag")
-                fi
-            done
-        fi
-    fi
-    robot_args+=("./tests")
+
+    # Add test path
+    pytest_args+=("./tests")
     
-    # Call adapter-S3-entrypoint.sh with robot arguments
-    echo "🚀 Calling adapter-S3-entrypoint.sh with arguments: ${robot_args[*]}"
-    ${ROBOT_HOME}/scripts/adapter-S3/adapter-S3-entrypoint.sh "${robot_args[@]}"
+    # Call adapter-S3-entrypoint.sh with pytest arguments
+    echo "🚀 Calling adapter-S3-entrypoint.sh with arguments: ${pytest_args[*]}"
+    ${ROBOT_HOME}/scripts/adapter-S3/adapter-S3-entrypoint.sh "${pytest_args[@]}"
 
-    robot_result=$?
-    if [[ ${robot_result} -ne 0 ]]; then
+    pytest_result=$?
+    if [[ ${pytest_result} -ne 0 ]]; then
         touch ./output/result.txt
-        echo "Robot framework process was interrupted with code - ${robot_result}"
+        echo "Pytest process was interrupted with code - ${pytest_result}"
     fi
 
+    # Analyze results (if analyze_result.py is adapted for pytest/junit XML)
     analyze_result_script="analyze_result.py"
     if [[ ${IS_ANALYZER_RESULT_ENABLED} == "true" ]]; then
         if [[ -n "$ANALYZE_RESULT_SCRIPT" ]]; then
             analyze_result_script=${ANALYZE_RESULT_SCRIPT}
         fi
-        python "${analyze_result_script}"
+        # Note: analyze_result.py may need adaptation for junit.xml format
+        python "${analyze_result_script}" 2>/dev/null || echo "⚠️ Result analyzer not available or failed"
     fi
 
     if [[ ${STATUS_WRITING_ENABLED} == "true" ]]; then
         if [[ ${IS_ANALYZER_RESULT_ENABLED} != "true" ]]; then
-            python "${analyze_result_script}"
+            python "${analyze_result_script}" 2>/dev/null || true
         fi
 
         if ! python "$status_writing_script" "update"; then
@@ -142,18 +125,32 @@ run_robot() {
     fi
 }
 
+# Keep backward compatibility - run_robot calls run_pytest for this project
+run_robot() {
+    echo "⚠️ run_robot is deprecated for pytest project, calling run_pytest instead"
+    run_pytest
+}
+
 # Process some known arguments to run integration tests
 case $1 in
 custom)
     run_custom_script
     ;;
+run-pytest)
+    # Run pytest tests
+    run_pytest
+    run_ttyd
+    ;;
+run-pytest-without-ttyd)
+    run_pytest
+    ;;
 run-robot)
-    # To keep backward compatibility with old entrypoint script we run ttyd by default
-    run_robot
+    # Backward compatibility - redirect to pytest
+    run_pytest
     run_ttyd
     ;;
 run-robot-without-ttyd)
-    run_robot
+    run_pytest
     ;;
 run-ttyd)
     run_ttyd

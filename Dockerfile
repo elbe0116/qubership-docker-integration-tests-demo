@@ -27,6 +27,7 @@ RUN \
         apk-tools \
         py3-yaml \
         ca-certificates \
+        inotify-tools \
     # Clean up
     && rm -rf /var/cache/apk/*
 
@@ -57,5 +58,5 @@ RUN \
 WORKDIR ${ROBOT_HOME}
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["run-robot"]
+CMD ["run-pytest"]
 
