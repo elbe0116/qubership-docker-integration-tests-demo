@@ -1,10 +1,7 @@
 # hadolint global ignore=DL3013,DL3018
 FROM python:3.13-alpine3.22
 
-# Use same paths as Robot for compatibility
 ENV ROBOT_HOME=/opt/robot \
-    ROBOT_OUTPUT=/opt/robot/output \
-    PYTEST_OUTPUT=/opt/robot/output \
     PYTHONPATH=/usr/local/lib/python3.13/site-packages/integration_library_builtIn \
     IS_ANALYZER_RESULT_ENABLED=true \
     IS_TAGS_RESOLVER_ENABLED=true \
@@ -61,4 +58,3 @@ WORKDIR ${ROBOT_HOME}
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["run-pytest"]
-

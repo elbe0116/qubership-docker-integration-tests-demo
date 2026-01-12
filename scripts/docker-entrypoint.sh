@@ -1,11 +1,9 @@
 #!/bin/bash
 
+# Same output directory as Robot (relative to ROBOT_HOME)
 export ROBOT_OPTIONS="--loglevel=info --outputdir output"
 export ROBOT_SYSLOG_FILE=./output/syslog.txt
 export ROBOT_SYSLOG_LEVEL=DEBUG
-
-# Pytest output directory (same as Robot for compatibility)
-export PYTEST_OUTPUT=${PYTEST_OUTPUT:-${ROBOT_OUTPUT:-/opt/robot/output}}
 
 if [[ "$READONLY_CONTAINER_FILE_SYSTEM_ENABLED" == "true" ]]; then
     echo "Read-only file system configuration enabled, copying test files from temp directory..."
@@ -73,12 +71,12 @@ run_pytest() {
     pytest_args=()
     pytest_args+=("-v")
     pytest_args+=("--tb=short")
-    pytest_args+=("--alluredir=${PYTEST_OUTPUT}/allure-results")
+    # Use relative path like Robot does (./output/allure-results)
+    pytest_args+=("--alluredir=./output/allure-results")
     
     # Handle tags (markers in pytest)
     if [[ -n "$TAGS" ]]; then
         # Convert Robot tags to pytest markers
-        # Replace OR with " or " for pytest marker expression
         marker_expr="${TAGS// OR / or }"
         marker_expr="${marker_expr//OR/ or }"
         pytest_args+=("-m" "$marker_expr")
@@ -90,7 +88,6 @@ run_pytest() {
         create_tags_resolver_array
         excluded_tags=${tags_resolver_array[0]}
         if [[ -n "$excluded_tags" ]]; then
-            # Add excluded tags to marker expression
             excluded_expr="${excluded_tags// OR / or }"
             excluded_expr="${excluded_expr//OR/ or }"
             excluded_expr="${excluded_expr//-e /}"
@@ -150,40 +147,31 @@ run_robot() {
         create_tags_resolver_array
         echo "Included tags: ${TAGS}"
         echo "Excluded tags: ${tags_resolver_array[0]}"
-        echo "${tags_resolver_array[1]}" # print all excluded tags with matched reason
+        echo "${tags_resolver_array[1]}"
         excluded_tags=${tags_resolver_array[0]}
     fi
 
     robot_args=()
     if [[ -n "$TAGS" ]]; then
-        # Split by OR and add each tag as separate -i parameter
         IFS='OR' read -ra tag_array <<< "$TAGS"
         for tag in "${tag_array[@]}"; do
-            # Skip empty tags
             if [[ -n "$tag" ]]; then
                 robot_args+=("-i" "$tag")
             fi
         done
     fi
     if [[ -n "$excluded_tags" ]]; then
-        # Remove the -e flag if it's already present and parse the tags
         if [[ "$excluded_tags" =~ ^-e[[:space:]]+(.*)$ ]]; then
-            # Extract tags without -e flag
             tags_only="${BASH_REMATCH[1]}"
-            # Split by OR and add each tag as separate -e parameter
             IFS='OR' read -ra excluded_tag_array <<< "$tags_only"
             for tag in "${excluded_tag_array[@]}"; do
-                # Skip empty tags
                 if [[ -n "$tag" ]]; then
                     robot_args+=("-e" "$tag")
                 fi
             done
         else
-            # No -e flag present, add it
-            # Split by OR and add each tag as separate -e parameter
             IFS='OR' read -ra excluded_tag_array <<< "$excluded_tags"
             for tag in "${excluded_tag_array[@]}"; do
-                # Skip empty tags
                 if [[ -n "$tag" ]]; then
                     robot_args+=("-e" "$tag")
                 fi
@@ -192,7 +180,6 @@ run_robot() {
     fi
     robot_args+=("./tests")
     
-    # Call adapter-S3-entrypoint.sh with robot arguments
     echo "🚀 Calling adapter-S3-entrypoint.sh with arguments: ${robot_args[*]}"
     ${ROBOT_HOME}/scripts/adapter-S3/adapter-S3-entrypoint.sh "${robot_args[@]}"
 
@@ -227,7 +214,6 @@ custom)
     run_custom_script
     ;;
 run-pytest)
-    # Run pytest with ttyd
     run_pytest
     run_ttyd
     ;;
@@ -235,7 +221,6 @@ run-pytest-without-ttyd)
     run_pytest
     ;;
 run-robot)
-    # To keep backward compatibility with old entrypoint script we run ttyd by default
     run_robot
     run_ttyd
     ;;
