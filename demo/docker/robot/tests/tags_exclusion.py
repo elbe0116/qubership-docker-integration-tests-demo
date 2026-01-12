@@ -1,2 +1,4 @@
-def get_excluded_tags(environ) -> list:
-    return ['third']
+"""Tags exclusion for pytest markers."""
+
+EXCLUDED_TAGS = []
+

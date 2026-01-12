@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Same output directory as Robot (relative to ROBOT_HOME)
 export ROBOT_OPTIONS="--loglevel=info --outputdir output"
 export ROBOT_SYSLOG_FILE=./output/syslog.txt
 export ROBOT_SYSLOG_LEVEL=DEBUG
@@ -67,20 +66,15 @@ run_pytest() {
         fi
     fi
 
-    # Build pytest arguments
-    pytest_args=()
-    pytest_args+=("-v")
-    pytest_args+=("--tb=short")
-    # Use relative path like Robot does (./output/allure-results)
-    pytest_args+=("--alluredir=./output/allure-results")
+    # Build pytest arguments - use same ./output path as robot
+    pytest_args=("-v" "--tb=short" "--alluredir=./output/allure-results")
     
-    # Handle tags (markers in pytest)
+    # Handle TAGS (convert to pytest markers)
     if [[ -n "$TAGS" ]]; then
-        # Convert Robot tags to pytest markers
         marker_expr="${TAGS// OR / or }"
         marker_expr="${marker_expr//OR/ or }"
         pytest_args+=("-m" "$marker_expr")
-        echo "Running with markers: $marker_expr"
+        echo "Included markers: $marker_expr"
     fi
 
     # Handle excluded tags
@@ -91,12 +85,12 @@ run_pytest() {
             excluded_expr="${excluded_tags// OR / or }"
             excluded_expr="${excluded_expr//OR/ or }"
             excluded_expr="${excluded_expr//-e /}"
+            echo "Excluded markers: $excluded_expr"
             if [[ -n "$marker_expr" ]]; then
                 pytest_args+=("-m" "$marker_expr and not ($excluded_expr)")
             else
                 pytest_args+=("-m" "not ($excluded_expr)")
             fi
-            echo "Excluded markers: $excluded_expr"
         fi
     fi
 
@@ -107,6 +101,7 @@ run_pytest() {
 
     pytest_result=$?
     if [[ ${pytest_result} -ne 0 ]]; then
+        touch ./output/result.txt
         echo "Pytest process finished with code - ${pytest_result}"
     fi
 
@@ -115,8 +110,6 @@ run_pytest() {
             echo "Can not update status for integration tests"
         fi
     fi
-    
-    return ${pytest_result}
 }
 
 run_robot() {
@@ -147,31 +140,40 @@ run_robot() {
         create_tags_resolver_array
         echo "Included tags: ${TAGS}"
         echo "Excluded tags: ${tags_resolver_array[0]}"
-        echo "${tags_resolver_array[1]}"
+        echo "${tags_resolver_array[1]}" # print all excluded tags with matched reason
         excluded_tags=${tags_resolver_array[0]}
     fi
 
     robot_args=()
     if [[ -n "$TAGS" ]]; then
+        # Split by OR and add each tag as separate -i parameter
         IFS='OR' read -ra tag_array <<< "$TAGS"
         for tag in "${tag_array[@]}"; do
+            # Skip empty tags
             if [[ -n "$tag" ]]; then
                 robot_args+=("-i" "$tag")
             fi
         done
     fi
     if [[ -n "$excluded_tags" ]]; then
+        # Remove the -e flag if it's already present and parse the tags
         if [[ "$excluded_tags" =~ ^-e[[:space:]]+(.*)$ ]]; then
+            # Extract tags without -e flag
             tags_only="${BASH_REMATCH[1]}"
+            # Split by OR and add each tag as separate -e parameter
             IFS='OR' read -ra excluded_tag_array <<< "$tags_only"
             for tag in "${excluded_tag_array[@]}"; do
+                # Skip empty tags
                 if [[ -n "$tag" ]]; then
                     robot_args+=("-e" "$tag")
                 fi
             done
         else
+            # No -e flag present, add it
+            # Split by OR and add each tag as separate -e parameter
             IFS='OR' read -ra excluded_tag_array <<< "$excluded_tags"
             for tag in "${excluded_tag_array[@]}"; do
+                # Skip empty tags
                 if [[ -n "$tag" ]]; then
                     robot_args+=("-e" "$tag")
                 fi
@@ -180,6 +182,7 @@ run_robot() {
     fi
     robot_args+=("./tests")
     
+    # Call adapter-S3-entrypoint.sh with robot arguments
     echo "🚀 Calling adapter-S3-entrypoint.sh with arguments: ${robot_args[*]}"
     ${ROBOT_HOME}/scripts/adapter-S3/adapter-S3-entrypoint.sh "${robot_args[@]}"
 
@@ -221,6 +224,7 @@ run-pytest-without-ttyd)
     run_pytest
     ;;
 run-robot)
+    # To keep backward compatibility with old entrypoint script we run ttyd by default
     run_robot
     run_ttyd
     ;;

@@ -27,6 +27,7 @@ RUN \
         apk-tools \
         py3-yaml \
         ca-certificates \
+        inotify-tools \
     # Clean up
     && rm -rf /var/cache/apk/*
 
@@ -49,10 +50,14 @@ RUN \
     && python3 -m pip install --no-cache-dir ${ROBOT_HOME}/integration-tests-built-in-library \
     # Clean up
     && rm -rf ${ROBOT_HOME}/integration-tests-built-in-library \
+    # Create output directory for reports
+    && mkdir -p ${ROBOT_HOME}/output/allure-results \
     # Set permissions
     && chmod +x /docker-entrypoint.sh \
     && chmod -R 775 ${ROBOT_HOME}/scripts/adapter-S3 \
-    && chgrp 0 /docker-entrypoint.sh
+    && chgrp 0 /docker-entrypoint.sh \
+    && chown -R ${USER_ID}:0 ${ROBOT_HOME} \
+    && chmod -R 775 ${ROBOT_HOME}
 
 WORKDIR ${ROBOT_HOME}
 
