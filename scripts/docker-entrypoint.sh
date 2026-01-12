@@ -4,8 +4,8 @@ export ROBOT_OPTIONS="--loglevel=info --outputdir output"
 export ROBOT_SYSLOG_FILE=./output/syslog.txt
 export ROBOT_SYSLOG_LEVEL=DEBUG
 
-# Pytest output directory
-export PYTEST_OUTPUT=${PYTEST_OUTPUT:-/opt/pytest/output}
+# Pytest output directory (same as Robot for compatibility)
+export PYTEST_OUTPUT=${PYTEST_OUTPUT:-${ROBOT_OUTPUT:-/opt/robot/output}}
 
 if [[ "$READONLY_CONTAINER_FILE_SYSTEM_ENABLED" == "true" ]]; then
     echo "Read-only file system configuration enabled, copying test files from temp directory..."
