@@ -63,3 +63,4 @@ WORKDIR ${ROBOT_HOME}
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["run-pytest"]
+ 
