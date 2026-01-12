@@ -96,6 +96,27 @@ run_pytest() {
 
     # Don't specify path - let pytest.ini testpaths handle it
     
+    # Debug: show directory structure
+    echo "========== DEBUG INFO =========="
+    echo "Current directory: $(pwd)"
+    echo "ROBOT_HOME: ${ROBOT_HOME}"
+    echo ""
+    echo "Contents of current directory:"
+    ls -la
+    echo ""
+    echo "Contents of tests directory (if exists):"
+    ls -la tests 2>/dev/null || echo "tests directory not found"
+    echo ""
+    echo "Contents of tests/step_defs (if exists):"
+    ls -la tests/step_defs 2>/dev/null || echo "tests/step_defs not found"
+    echo ""
+    echo "pytest.ini contents:"
+    cat pytest.ini 2>/dev/null || echo "pytest.ini not found"
+    echo ""
+    echo "Full directory tree:"
+    find . -type f -name "*.py" -o -name "*.feature" -o -name "pytest.ini" 2>/dev/null | head -50
+    echo "================================"
+    
     echo "🚀 Running pytest with arguments: ${pytest_args[*]}"
     pytest "${pytest_args[@]}"
 
