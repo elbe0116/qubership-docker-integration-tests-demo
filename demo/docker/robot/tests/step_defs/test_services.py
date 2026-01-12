@@ -2,7 +2,7 @@
 
 from pytest_bdd import scenarios, when, then, parsers
 
-scenarios("../features/services.feature")
+scenarios("services.feature")
 
 
 @when(parsers.parse('I get service "{name}" in namespace "{namespace}"'))
