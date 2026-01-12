@@ -1,7 +1,10 @@
 # hadolint global ignore=DL3013,DL3018
 FROM python:3.13-alpine3.22
 
+# Keep ROBOT_HOME for backward compatibility with child images
 ENV ROBOT_HOME=/opt/robot \
+    PYTEST_HOME=/opt/pytest \
+    PYTEST_OUTPUT=/opt/pytest/output \
     PYTHONPATH=/usr/local/lib/python3.13/site-packages/integration_library_builtIn \
     IS_ANALYZER_RESULT_ENABLED=true \
     IS_TAGS_RESOLVER_ENABLED=true \
@@ -27,7 +30,6 @@ RUN \
         apk-tools \
         py3-yaml \
         ca-certificates \
-        inotify-tools \
     # Clean up
     && rm -rf /var/cache/apk/*
 
@@ -50,6 +52,10 @@ RUN \
     && python3 -m pip install --no-cache-dir ${ROBOT_HOME}/integration-tests-built-in-library \
     # Clean up
     && rm -rf ${ROBOT_HOME}/integration-tests-built-in-library \
+    # Create pytest output directory with proper permissions
+    && mkdir -p ${PYTEST_OUTPUT}/allure-results \
+    && chown -R ${USER_ID}:0 ${PYTEST_OUTPUT} \
+    && chmod -R 775 ${PYTEST_OUTPUT} \
     # Set permissions
     && chmod +x /docker-entrypoint.sh \
     && chmod -R 775 ${ROBOT_HOME}/scripts/adapter-S3 \

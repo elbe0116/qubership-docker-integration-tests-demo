@@ -1,3 +1,4 @@
+# Core dependencies
 boto3==1.40.23
 botocore==1.40.23
 deprecated==1.2.18
@@ -9,10 +10,11 @@ requests==2.32.5
 requests_oauthlib==2.0.0
 setuptools~=80.9.0
 urllib3~=2.5.0
-# pytest and allure
+
+# pytest and BDD
 pytest>=8.0.0
 pytest-bdd>=7.3.0
-pytest-mock
-pytest-cov
-coverage
+pytest-timeout>=2.2.0
+
+# Allure reporting
 allure-pytest>=2.13.0

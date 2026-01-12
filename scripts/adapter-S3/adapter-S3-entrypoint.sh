@@ -9,12 +9,12 @@ echo "📅 Timestamp: $(date)"
 # Set default upload method
 export UPLOAD_METHOD="${UPLOAD_METHOD:-sync}"
 echo "📤 Upload method: $UPLOAD_METHOD"
-echo "📦 Report view host URL: $ATP_REPORT_VIEW_UI_URL"
-echo "📦 S3 bucket: ${ATP_STORAGE_BUCKET:-<not set>}"
-echo "📦 S3 provider: ${ATP_STORAGE_PROVIDER:-<not set>}"
-echo "📦 S3 API host: ${ATP_STORAGE_SERVER_URL:-<not set>}"
-echo "📦 S3 UI URL: ${ATP_STORAGE_SERVER_UI_URL:-<not set>}"
-echo "📦 Environment name: $ENVIRONMENT_NAME"
+echo "📦 Report view host URL: $REPORT_VIEW_HOST_URL"
+echo "📦 S3 bucket: $S3_BUCKET"
+echo "📦 S3 type: $S3_TYPE"
+echo "📦 S3 API host: $S3_API_HOST"
+echo "📦 S3 UI URL: $S3_UI_URL"
+echo "📦 Environment name: $ENV_NAME"
 
 
 # Import modular components
@@ -26,27 +26,11 @@ source ${ROBOT_HOME}/scripts/adapter-S3/upload-monitor.sh
 echo "🚀 Starting test execution workflow..."
 
 # Store all arguments passed to this script
-echo "📋 Pytest arguments: $@"
+echo "📋 Robot arguments: $@"
 
-# Initialize environment
 init_environment
-
-# Start upload monitoring only if S3 is enabled
-if [[ -n "${ATP_STORAGE_BUCKET}" ]]; then
-    start_upload_monitoring
-else
-    echo "⚠️ Skipping upload monitoring (S3 integration disabled)"
-fi
-
-# Run tests
+start_upload_monitoring
 run_tests "$@"
-
-# Finalize upload only if S3 is enabled
-if [[ -n "${ATP_STORAGE_BUCKET}" ]]; then
-    finalize_upload
-else
-    echo "⚠️ Skipping upload finalization (S3 integration disabled)"
-    echo "📁 Test results are available locally at: $TMP_DIR"
-fi
+finalize_upload
 
 echo "✅ Test job finished successfully!"
