@@ -94,7 +94,7 @@ run_pytest() {
         fi
     fi
 
-    pytest_args+=("./tests")
+    # Don't specify path - let pytest.ini testpaths handle it
     
     echo "🚀 Running pytest with arguments: ${pytest_args[*]}"
     pytest "${pytest_args[@]}"
