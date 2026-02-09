@@ -1673,3 +1673,23 @@ class PlatformLibrary(object):
             return cm
         else:
             return None
+
+    def get_pod_logs(self, pod_name: str, namespace: str, container_name: str = None, tail_lines: int = None):
+        """
+        Returns logs from a pod in specified namespace.
+
+        Args:
+            pod_name: Name of the pod
+            namespace: Namespace where the pod is located
+            container_name: Name of the container (optional, required for multi-container pods)
+            tail_lines: Number of lines to return from the end of the logs (optional)
+
+        Example:
+        | Get Pod Logs | my-pod | default | container_name=app | tail_lines=100 |
+        """
+        return self.k8s_core_v1_client.read_namespaced_pod_log(
+            name=pod_name,
+            namespace=namespace,
+            container=container_name,
+            tail_lines=tail_lines
+        )
